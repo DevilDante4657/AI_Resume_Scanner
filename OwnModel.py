@@ -11,6 +11,16 @@ nlp = spacy.load("en_core_web_lg")
 Files = kagglehub.dataset_download("snehaanbhawal/resume-dataset")
 #for root, dirs, files in os.walk(Files):
     #for file in files:
+
+def get_section(text: str, heading: str) -> str:
+
+    pattern = re.compile(
+        rf"{heading}\s*(.*?)(?=\n[A-Z][A-Z &/]+?\s*$|\Z)",
+        re.IGNORECASE | re.DOTALL | re.MULTILINE
+    )
+    match = pattern.search(text)
+    return match.group(1) if match else ""
+
 def PdfExtract(path):
     Read = PdfReader(path)
     DocText = ""
@@ -39,21 +49,93 @@ def Identify(path):
             Text = ImgExtract(path)
     return Text
 
+SKILL_WHITELIST = {
+    # languages
+    "c", "c++", "c/c++", "java", "python", "javascript", "js",
+    "html", "html5", "css", "sml", "ruby", "perl", "php", "c#",
+    "x86", "x86 assembly",
+
+    # tools / tech
+    "windows", "linux", "mysql", "opengl", "asp.net", "win32", "api/gui",
+    "git", "django", "android", "latex",
+
+    # concepts
+    "data structures", "software design patterns",
+}
+
+GENERIC_WORDS = {
+    "experience", "education", "projects", "activities", "links",
+    "coursework", "objective", "position", "industry", "skills",
+    "project", "team", "work", "role", "job"
+}
+
+def looks_like_tech(term: str) -> bool:
+    """Heuristic to allow new skills not in the whitelist."""
+    t = term.lower().strip()
+
+    if not t or t in GENERIC_WORDS:
+        return False
+
+    # too long → probably a sentence, not a skill
+    if len(t.split()) > 4:
+        return False
+
+    # only allow reasonable characters: letters, digits, +, #, ., -, /
+    if not re.match(r"^[a-z0-9 +#.\-/]+$", t):
+        return False
+
+    # avoid very generic nouns
+    GENERIC_PARTS = {"problems", "solutions", "email", "customers",
+                     "foundation", "industry", "position", "mission"}
+    if any(g in t for g in GENERIC_PARTS):
+        return False
+
+    return True
+
 def ExtractSkills(doc):
+    full_text = doc.text
+    skills_text = get_section(full_text, "SKILLS")
+    if not skills_text:
+        skills_text = full_text  # fallback
+
+    raw_items = re.split(r"[•\|\n,;/]+", skills_text)
+
     skills = set()
-    for chunk in doc.noun_chunks:
-        text = chunk.text.lower().strip()
-        if len(text) < 3:
+
+    for item in raw_items:
+        line = item.strip(" -\t")
+        if not line:
             continue
-        if text in ["experience", "project", "team", "work", "role", "job"]:
-            continue
-        if text.isalpha() or text.replace(" ", "").isalpha():
-            skills.add(text)
+
+        # if there's a colon (e.g. "Coding: C/C++, Java"), use the right side
+        if ":" in line:
+            line = line.split(":", 1)[1].strip()
+
+        tokens = re.split(r"\s+", line)
+        buffer = []
+        for tok in tokens:
+            tok = tok.strip("()[]")
+            if not tok:
+                continue
+            buffer.append(tok)
+
+        joined = " ".join(buffer).lower()
+
+        # 1) phrase-level check
+        if joined in SKILL_WHITELIST or looks_like_tech(joined):
+            skills.add(joined)
+
+        # 2) token-level check (for things like "java", "c/c++")
+        for tok in buffer:
+            t = tok.lower().rstrip(".")
+            if t in SKILL_WHITELIST or looks_like_tech(t):
+                skills.add(t)
+
     return skills
 
 def ExtractEdu(doc):
     EduWord = set()
-    DegreeIdentifier = r"\b(bachelor|masters|master|b\.?s\.?|m\.?s\.?|mba|phd|associate|diploma)\b"
+    DegreeIdentifier = r"\b(bachelor(?:'s)?|master(?:'s)?|b\.?s\.?|bsc|m\.?s\.?|msc|mba|ph\.?d\.?|associate(?:'s)?|diploma)\b"
     for ent in doc.ents:
         if ent.label_ == "ORG" and any(k in ent.text.lower() for k in ["university", "college", "institute", "school"]):
             EduWord.add(ent.text.lower())
@@ -81,13 +163,13 @@ def Score(items):
         return 0
     num_items = len(items)
     import math
-    score = math.log2(num_items + 1) / math.log2(21) * 100  
+    score = math.log2(num_items + 1) / math.log2(21) * 100
     score = min(score, 100)
     return int(score)
 
 
 DocText = ""
-DocText = Identify("C:/Users/kingd/Downloads/AI Resume Scanner/3547447.pdf")
+DocText = Identify("MayTrix2.pdf")
 DocumentBeta = nlp(DocText)
 
 skills = ExtractSkills(DocumentBeta)
@@ -111,4 +193,4 @@ print("Detected Experience:", experience)
 print("Skills Score:", SkillScore)
 print("Education Score:", EduScore)
 print("Experience Score:", ExpScore)
-print("Final Resume Score:", FinalScore)
+print("Final Resume Score:", Final
