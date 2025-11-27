@@ -5,6 +5,15 @@ from database.models import (
 from datetime import datetime
 import uuid
 
+from exceptions import (
+    UserNotFoundError,
+    ResumeNotFoundError,
+    ResumeCreationError,
+    KeywordCreationError,
+    AdminCreationError,
+    AnalysisUpdateError,
+)
+
 # User Operations
 
 class UserOperations:
@@ -12,6 +21,9 @@ class UserOperations:
     @staticmethod
     def create_user(username, email, password_hash):
         try:
+            if User.objects(email=email.lower()).first():
+                raise AdminCreationError("A user with this email already exists")
+                
             user_id = str(uuid.uuid4())
             user = User(
                 user_id=user_id,
@@ -26,30 +38,36 @@ class UserOperations:
             
             return user
         except Exception as e:
-            print(f"Error creating user: {e}")
-            return None
+            raise AdminCreationError("Failed to create user: {e}")
     
     @staticmethod
     def get_user_by_email(email):
         try:
-            return User.objects(email=email.lower()).first()
+            user = User.objects(email=email.lower()).first()
+            if not user:
+                raise UserNotFoundError("User not found")
+                
+            return user
         except Exception as e:
-            print(f"Error finding user: {e}")
-            return None
+          raise UserNotFoundError(str(e))
     
     @staticmethod
     def get_user_by_id(user_id):
         try:
-            return User.objects(user_id=user_id).first()
+            user = User.objects(user_id=user_id).first()
+            if not user:
+                raise UserNotFoundError("User not found")
+            return user
         except Exception as e:
-            print(f"Error finding user: {e}")
-            return None
-    
+            raise UserNotFoundError(str(e))
+            
     @staticmethod
     def update_last_login(user_id):
         try:
             user = User.objects(user_id=user_id).first()
-            if user:
+            if not user:
+                raise UserNotFoundError("User not found")
+            
                 user.last_login = datetime.now()
                 user.save()
                 
@@ -61,8 +79,7 @@ class UserOperations:
                 
                 return user
         except Exception as e:
-            print(f"Error updating login: {e}")
-            return None
+            raise UserNotFoundError(f"Failed to update login: {e}")
 
 # Resume Operations
 
@@ -71,11 +88,11 @@ class ResumeOperations:
     @staticmethod
     def create_resume(user_id, file_name, file_type, original_text, file_url=None):
         try:
-            resume_id = str(uuid.uuid4())
             user = User.objects(user_id=user_id).first()
-            
-            if not user:
-                raise Exception("User not found")
+                if not user:
+                    raise UserNotFoundError("User not found")
+                    
+            resume_id = str(uuid.uuid4())
             
             resume = Resume(
                 resume_id=resume_id,
@@ -89,44 +106,50 @@ class ResumeOperations:
             resume.save()
             return resume
         except Exception as e:
-            print(f"Error creating resume: {e}")
-            return None
+            raise ResumeCreationError(f"Failed to create resume: {e}")
     
     @staticmethod
     def get_resume_by_id(resume_id):
         try:
-            return Resume.objects(resume_id=resume_id).first()
+            resume = Resume.objects(resume_id=resume_id).first()
+            if not resume:
+                raise ResumeNotFoundError("Resume not found")
+            return resume
         except Exception as e:
-            print(f"Error finding resume: {e}")
-            return None
+            raise ResumeNotFoundError(str(e))
     
     @staticmethod
     def get_user_resumes(user_id):
         try:
             user = User.objects(user_id=user_id).first()
+            if not user:
+                raise UserNotFoundError("User not found")
+                
             return Resume.objects(user_id=user).order_by('-upload_date')
         except Exception as e:
-            print(f"Error finding resumes: {e}")
-            return []
+            raise ResumeNotFoundError(f"Failed to fetch resumes: {e}")
     
     @staticmethod
     def update_resume_status(resume_id, status):
         try:
             resume = Resume.objects(resume_id=resume_id).first()
-            if resume:
+            if not resume:
+                raise ResumeNotFoundError("Resume not found.")
+                
                 resume.status = status
                 resume.save()
                 return resume
         except Exception as e:
-            print(f"Error updating status: {e}")
-            return None
+            raise ResumeNotFoundError("Resume not found")
     
     @staticmethod
     def update_resume_with_analysis(resume_id, score, analysis_data):
         # Called by AI component to store analysis results
         try:
             resume = Resume.objects(resume_id=resume_id).first()
-            if resume:
+            if not resume:
+                raise ResumeNotFoundError("Resume not found")
+                
                 resume.overall_score = score
                 resume.scan_date = datetime.now()
                 resume.status = "completed"
@@ -149,20 +172,19 @@ class ResumeOperations:
                 resume.save()
                 return resume
         except Exception as e:
-            print(f"Error updating resume analysis: {e}")
-            return None
+            raise AnalysisUpdateError(f"Failed to update analysis: {e}")
     
     @staticmethod
     def delete_resume(resume_id):
         try:
             resume = Resume.objects(resume_id=resume_id).first()
-            if resume:
+            if not resume:
+                raise ResumeNotFoundError("Resume not found")
+          
                 resume.delete()
                 return True
-            return False
         except Exception as e:
-            print(f"Error deleting resume: {e}")
-            return False
+            raise ResumeNotFoundError(f"Failed to delete resume: {e}")
 
 # Keywords Operations
 
@@ -171,9 +193,11 @@ class KeywordsOperations:
     @staticmethod
     def create_keyword_input(keywords, user_id, industry=None, job_role=None, job_description=None):
         try:
-            keyword_id = str(uuid.uuid4())
             user = User.objects(user_id=user_id).first()
+            if not user:
+                raise UserNotFoundError("User not found")
             
+            keyword_id = str(uuid.uuid4())
             keyword_input = KeywordsUserInput(
                 keyword_id=keyword_id,
                 keywords=keywords,
@@ -185,16 +209,17 @@ class KeywordsOperations:
             keyword_input.save()
             return keyword_input
         except Exception as e:
-            print(f"Error creating keyword input: {e}")
-            return None
+            raise KeywordCreationError(f"Failed to create keyword input: {e}")
     
     @staticmethod
     def get_keywords_by_id(keyword_id):
         try:
-            return KeywordsUserInput.objects(keyword_id=keyword_id).first()
+             KeywordsUserInput.objects(keyword_id=keyword_id).first()
+            if not keywords:
+                raise KeywordCreationError("Keyword input not found")
+                return keywords
         except Exception as e:
-            print(f"Error finding keywords: {e}")
-            return None
+            raise KeywordCreationError(str(e))
 
 # ML Model Operations
 
@@ -204,7 +229,12 @@ class MLModelOperations:
     def log_ml_execution(resume_id, score, feedback, keyword_id=None, processing_time=0):
         try:
             resume = Resume.objects(resume_id=resume_id).first()
-            keywords = KeywordsUserInput.objects(keyword_id=keyword_id).first() if keyword_id else None
+            if not resume:
+                raise ResumeNotFoundError("Resume not found for ML logging")
+
+            keywords = None
+            if keyword_id:
+            keywords = KeywordsUserInput.objects(keyword_id=keyword_id).first()
             
             ml_result = MLModel(
                 resume_id=resume,
@@ -217,8 +247,7 @@ class MLModelOperations:
             ml_result.save()
             return ml_result
         except Exception as e:
-            print(f"Error logging ML execution: {e}")
-            return None
+            raise AnalyisUpdateError(f"Failed to log ML execution: {e}")
 
 # Updated Resume Operations
 
@@ -227,8 +256,9 @@ class UpdatedResumeOperations:
     @staticmethod
     def create_updated_resume(original_resume_id, updated_text, changes_made, improvement_score):
         try:
-            resume_id = str(uuid.uuid4())
             original = Resume.objects(resume_id=original_resume_id).first()
+            if not original:
+                raise ResumeNotFoundError("Original resume not found")
             
             updated = UpdatedResume(
                 resume_id=resume_id,
@@ -241,17 +271,21 @@ class UpdatedResumeOperations:
             updated.save()
             return updated
         except Exception as e:
-            print(f"Error creating updated resume: {e}")
-            return None
+            raise AnalysisUpdateError(f"Failed to create updated resume: {e}")
     
     @staticmethod
     def get_updated_resume(original_resume_id):
         try:
             original = Resume.objects(resume_id=original_resume_id).first()
-            return UpdatedResume.objects(original_resume_id=original).first()
+            if not original:
+                raise ResumeNotFoundError("Original resume not found")
+                
+            updated = UpdatedResume.objects(original_resume_id=original).first()
+            if not updated:
+                raise ResumeNotFoundError("Updated resume not found")
+        return updated
         except Exception as e:
-            print(f"Error finding updated resume: {e}")
-            return None
+            raise ResumeNotFoundError("Updated resume not found")
 
 # Admin Operations
 
@@ -260,6 +294,9 @@ class AdminOperations:
     @staticmethod
     def create_admin(username, email, password_hash):
         try:
+            if Admin.objects(email=email.lower()).first():
+                raise AdminCreationError("Admin with this email already exists.")
+                
             admin_id = str(uuid.uuid4())
             admin = Admin(
                 admin_id=admin_id,
@@ -271,21 +308,28 @@ class AdminOperations:
             admin.save()
             return admin
         except Exception as e:
-            print(f"Error creating admin: {e}")
-            return None
+            raise AdminCreationError(f"Failed to create admin {e}")
+    @staticmethod
+    def get_admin_by_email(email):
+        try:
+            admin = Admin.objects(email=email.lower()).first()
+            if not admin:
+                raise AdminCreationError("Admin not found")
+               return admin
+        except Exception as e:
+            raise AdminCreationError(f"failed to get admin: {e}")
+
     
     @staticmethod
     def get_all_users():
         try:
             return User.objects.all()
         except Exception as e:
-            print(f"Error retrieving users: {e}")
-            return []
-    
+            raise AdminCreationError(f"Failed to retrieve users: {e}")
+            
     @staticmethod
     def get_all_resumes():
         try:
             return Resume.objects.all()
         except Exception as e:
-            print(f"Error retrieving resumes: {e}")
-            return []
+            raise AdminCreationError(f"Failed to retrieve resumes: {e}")
