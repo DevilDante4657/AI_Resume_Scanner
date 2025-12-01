@@ -13,9 +13,8 @@ Files = kagglehub.dataset_download("snehaanbhawal/resume-dataset")
     #for file in files:
 
 def get_section(text: str, heading: str) -> str:
-
     pattern = re.compile(
-        rf"{heading}\s*(.*?)(?=\n[A-Z][A-Z &/]+?\s*$|\Z)",
+        rf"^{heading}\s*(.*?)(?=\n[A-Z][A-Z &/]+?\s*$|\Z)",
         re.IGNORECASE | re.DOTALL | re.MULTILINE
     )
     match = pattern.search(text)
@@ -51,13 +50,26 @@ def Identify(path):
 
 SKILL_WHITELIST = {
 
-    "c", "c++", "c/c++", "java", "python", "javascript", "js",
-    "html", "html5", "css", "sml", "ruby", "perl", "php", "c#",
-    "x86", "x86 assembly",
+    "python", "java", "javascript","typescript","c", "c++",
+    "c#", "go", "rust", "swift", "kotlin", "ruby", "php", "scala", "haskell", "dart", "objective-c", "r",
+    "assembly",  "x86 assembly",  "arm assembly", "verilog", "vhdl", "matlab", "fortran"
 
     "windows", "linux", "mysql", "opengl", "asp.net", "win32", "api/gui",
-    "git", "django", "android", "latex",
+    "git", "django", "android", "latex", "springboot"
     "data structures", "software design patterns",
+
+    "assembly", "x86 assembly", "arm assembly", "verilog", "vhdl",
+    "matlab", "fortran",
+
+    "sql", "mysql", "postgresql", "sqlite", "mongodb", "redis",
+    "cassandra", "graphql", "dynamodb",
+
+    "pytorch", "tensorflow", "numpy", "pandas", "scikit-learn",
+    "matplotlib", "keras", "jupyter",
+   #cloud
+    "aws", "azure", "gcp", "docker", "kubernetes", "terraform",
+    "jenkins", "linux", "bash", "powershell",
+    "android", "android studio", "xcode", "react native", "flutter",
 }
 
 GENERIC_WORDS = {
@@ -81,7 +93,17 @@ STOPWORDS = {
     "have", "been", "developed", "develop", "developing"
 }
 
-def looks_like_tech(term: str) -> bool:
+SKILL_HEADERS = [
+    "SKILLS",
+    "TECHNICAL SKILLS",
+    "TECHNICAL SKILLS & TOOLS",
+    "PROGRAMMING LANGUAGES",
+    "PROFICIENCIES",
+    "TECHNOLOGIES",
+    "TOOLS"
+]
+# term causing errors in model
+def Generic_T(term: str) -> bool:
     t = term.lower().strip()
 
     if not t or t in GENERIC_WORDS:
@@ -108,10 +130,14 @@ def ExtractSkills(doc):
     # ------------------------------
     # 1) Try to get SKILLS section
     # ------------------------------
-    skills_text = get_section(doc.text, "SKILLS")
+    skills_text = ""
+    for h in SKILL_HEADERS:
+        section = get_section(doc.text, h)
+        if section:
+            skills_text = section
+            break
 
     if skills_text:
-        # split on bullets, commas, newlines, pipes, slashes
         raw_items = re.split(r"[•\|\n,;/]+", skills_text)
 
         for item in raw_items:
@@ -155,7 +181,7 @@ def ExtractSkills(doc):
     words = set(re.findall(r"[a-zA-Z0-9+#.-]+", text))
 
     for w in words:
-        if looks_like_tech(w):
+        if Generic_T(w):
             # must appear near tech context to count
             context_pattern = rf"{w}.{{0,20}}({'|'.join(CONTEXT)})|" \
                               rf"({'|'.join(CONTEXT)}).{{0,20}}{w}"
@@ -168,13 +194,68 @@ def ExtractSkills(doc):
 
 
 def ExtractEducation(doc):
-    EduWord = set()
-    DegreeIdentifier = r"\b(bachelor(?:'s)?|master(?:'s)?|b\.?s\.?|bsc|m\.?s\.?|msc|mba|ph\.?d\.?|associate(?:'s)?|diploma)\b"
-    for ent in doc.ents:
-        if ent.label_ == "ORG" and any(k in ent.text.lower() for k in ["university", "college", "institute", "school"]):
-            EduWord.add(ent.text.lower())
-    matches = re.findall(DegreeIdentifier, doc.text.lower())
-    EduWord.update(matches)
+    # Accept spaCy Doc or raw text
+    if hasattr(doc, "text"):
+        text = doc.text
+    else:
+        text = str(doc)
+
+    # 1) Focus on the EDUCATION section if present
+    edu_section = get_section(text, "EDUCATION")
+    if not edu_section:
+        # fallback: use whole doc (last resort)
+        edu_section = text
+
+    lines = [ln.strip() for ln in edu_section.splitlines() if ln.strip()]
+
+    SCHOOL_KEYWORDS = ("university", "college", "institute", "school")
+    DEGREE_PATTERN = re.compile(
+        r"(bachelor|master|associate|ph\.?d|phd|mba)[^,\n]*",
+        re.IGNORECASE
+    )
+
+    schools = set()
+    degrees = set()
+
+    for line in lines:
+        lower = line.lower()
+
+        # --------- SCHOOLS ---------
+        if any(k in lower for k in SCHOOL_KEYWORDS):
+            cleaned = lower
+
+            # remove any month/year blobs on that line
+            cleaned = re.sub(
+                r"(spring|summer|fall|winter)\s+\d{4}.*", "", cleaned
+            )
+            cleaned = re.sub(
+                r"(january|february|march|april|may|june|july|august|"
+                r"september|october|november|december)\s+\d{4}.*",
+                "",
+                cleaned,
+            )
+            # ALSO just strip season words themselves in case year is on another line
+            cleaned = re.sub(r"\b(spring|summer|fall|winter)\b", "", cleaned)
+
+            cleaned = re.sub(r"\s{2,}", " ", cleaned)
+            cleaned = cleaned.strip(" ,;-")
+            if cleaned:
+                schools.add(cleaned)
+
+        # --------- DEGREES ---------
+        m = DEGREE_PATTERN.search(lower)
+        if m:
+            degree_line = lower
+
+            # Strip trailing locations like "towson, md"
+            degree_line = re.sub(r",\s*[a-z .]+,\s*[a-z]{2}\s*$", "", degree_line)
+
+            degree_line = re.sub(r"\s{2,}", " ", degree_line)
+            degree_line = degree_line.strip(" ,;-")
+            if degree_line:
+                degrees.add(degree_line)
+
+    EduWord = schools.union(degrees)
     return EduWord
 
 def ExtractExperience(doc):
@@ -248,6 +329,23 @@ def ExtractExperience(doc):
             if t in {"intern", "engineer", "developer"}:
                 ExpWord.add(token.text.strip())
 
+    skip_exp = set()
+    for item in ExpWord:
+        lower = item.lower()
+        # Skip if it is a skill
+        if lower in SKILL_WHITELIST:
+            continue
+        # Skip basic tech words
+        if lower in {"css", "html", "api", "ui", "python", "java", "javascript"}:
+            continue
+        # Skip IDEs unless you want them as experience
+        if lower in {"android studio", "visual studio", "xcode"}:
+            continue
+
+        skip_exp.add(item)
+
+    return skip_exp
+
     return ExpWord
 
 
@@ -262,7 +360,7 @@ def Score(items):
 
 
 DocText = ""
-DocText = Identify("CS resumeJackDawson.pdf")
+DocText = Identify("Victoria-computer-engineering.pdf")
 DocumentBeta = nlp(DocText)
 
 
