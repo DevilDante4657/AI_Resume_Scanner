@@ -44,12 +44,12 @@ button:disabled {
 }
 
 
-/* LAYOUT WRAPPER ------------------------------------------------------- */
+
 .content-wrapper {
   min-height: calc(100vh - 120px);
 }
 
-/* NAVBAR --------------------------------------------------------------- */
+
 .navbar {
   position: sticky;
   top: 0;
@@ -84,13 +84,13 @@ button:disabled {
   color: #7c3aed;
 }
 
-/* HOME PAGE  -------------------------------------- */
+
 
 .home-container {
   padding: 40px 32px 60px;
 }
 
-/* HERO */
+
 
 .hero {
   background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 45%, #eef2ff 100%);
@@ -156,7 +156,7 @@ button:disabled {
 .hero-secondary {
   font-size: 13px;
   color: #e5e7eb;
-  margin-left: 4px; /* slight push so it aligns correctly */
+  margin-left: 4px; 
 }
 
 .hero-metric-row {
@@ -186,7 +186,7 @@ button:disabled {
   letter-spacing: 0.12em;
 }
 
-/* HERO RIGHT CARD */
+
 
 .hero-right {
   flex: 1 1 260px;
@@ -261,7 +261,7 @@ button:disabled {
   margin-top: 4px;
 }
 
-/* HOME SECTIONS ------------------------------------------------------- */
+
 
 .home-section {
   max-width: 920px;
@@ -351,7 +351,7 @@ button:disabled {
   color: #4b5563;
 }
 
-/* PAGE WRAPPER --------------------------------------------------------- */
+
 .page-container {
   max-width: 900px;
   margin: 60px auto;
@@ -362,12 +362,12 @@ button:disabled {
   align-items: center;
 }
 
-/* SCANNER PAGE --------------------------------------------------------- */
+
 .scanner-page {
   text-align: center;
 }
 
-/* Scanner Card Box */
+
 .scanner-card {
   background: #ffffff;
   border-radius: 24px;
@@ -394,7 +394,7 @@ button:disabled {
   margin: 0 auto 20px;
 }
 
-/* Upload Box */
+
 .upload-box {
   margin-top: 24px;
   background: #ffffff;
@@ -440,7 +440,7 @@ button:disabled {
   color: #6b7280;
 }
 
-/* RESULT BOX ----------------------------------------------------------- */
+
 .result-box {
   margin-top: 28px;
   background: #f9fafb;
@@ -485,7 +485,7 @@ button:disabled {
   margin-bottom: 12px;
 }
 
-/* BREAKDOWN LIST ------------------------------------------------------- */
+
 .breakdown-heading {
   font-size: 15px;
   font-weight: 600;
@@ -510,7 +510,7 @@ button:disabled {
 }
 
 .breakdown-item.met {
-  color: #059669; /* green */
+  color: #059669; 
 }
 
 .breakdown-item.not-met {
@@ -526,7 +526,7 @@ button:disabled {
   font-weight: 700;
 }
 
-/* DOWNLOAD BUTTON ------------------------------------------------------- */
+
 .download-btn {
   margin-top: 18px;
   padding: 12px 22px;
@@ -543,13 +543,13 @@ button:disabled {
   opacity: 0.85;
 }
 
-/* ABOUT PAGE ----------------------------------------------------------- */
+
 
 .about-page {
-  align-items: stretch; /* let content span nicely instead of super narrow */
+  align-items: stretch; 
 }
 
-/* Top hero block */
+
 .about-hero {
   max-width: 900px;
   margin-bottom: 28px;
@@ -567,7 +567,7 @@ button:disabled {
   margin-bottom: 18px;
 }
 
-/* Badges row */
+
 .about-badges {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -594,7 +594,7 @@ button:disabled {
   color: #4b5563;
 }
 
-/* Main grid */
+
 .about-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.3fr);
@@ -623,7 +623,7 @@ button:disabled {
   margin-bottom: 10px;
 }
 
-/* Steps list */
+
 .about-steps {
   list-style: none;
   padding: 0;
@@ -662,7 +662,7 @@ button:disabled {
   color: #4b5563;
 }
 
-/* Philosophy list */
+
 .about-list {
   margin-top: 6px;
   padding-left: 0;
@@ -678,7 +678,7 @@ button:disabled {
   color: #374151;
 }
 
-/* Bottom CTA */
+
 .about-cta {
   max-width: 900px;
   padding: 18px 20px;
@@ -879,4 +879,69 @@ button:disabled {
   font-size: 14px;
   color: #6b7280;
   background: #ffffff;
+}
+
+
+.login-page {
+  align-items: center;
+}
+
+.login-card {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 24px 22px 20px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12);
+}
+
+.login-card h1 {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.login-subtitle {
+  font-size: 14px;
+  color: #4b5563;
+  margin-bottom: 14px;
+}
+
+.login-error {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.login-form {
+  margin-top: 4px;
+}
+
+.login-field {
+  margin-bottom: 10px;
+}
+
+.login-field label {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.login-toggle {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.login-toggle button {
+  background: transparent;
+  border: none;
+  color: #7c3aed;
+  padding: 0;
+  box-shadow: none;
+  font-size: 13px;
 }
