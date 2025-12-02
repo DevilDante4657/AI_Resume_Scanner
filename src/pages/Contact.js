@@ -3,13 +3,11 @@ import React from "react";
 function Contact() {
   const handleSubmit = (e) => {
     e.preventDefault();
-    // For now, just prevent refresh. You can hook this up to an API or email later.
     alert("Thanks for reaching out! This demo doesn't send messages yet, but your form is working.");
   };
 
   return (
     <section className="page-container contact-page">
-      {/* Top intro */}
       <div className="contact-hero">
         <h1 className="contact-title">Get in touch</h1>
         <p className="contact-subtitle">
@@ -18,7 +16,6 @@ function Contact() {
         </p>
       </div>
 
-      {/* Support cards */}
       <div className="contact-grid">
         <div className="contact-card">
           <h3>General questions</h3>
@@ -46,9 +43,8 @@ function Contact() {
         </div>
       </div>
 
-      {/* Layout: info + form */}
+
       <div className="contact-layout">
-        {/* Left info blurb */}
         <div className="contact-info">
           <h2>Send us a message</h2>
           <p>
@@ -64,7 +60,6 @@ function Contact() {
           </ul>
         </div>
 
-        {/* Right form */}
         <div className="contact-form-card">
           <form onSubmit={handleSubmit} className="contact-form">
             <div className="contact-form-row">

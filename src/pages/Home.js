@@ -4,10 +4,10 @@ import { Link } from "react-router-dom";
 function Home() {
   return (
     <div className="home-container">
-      {/* HERO SECTION */}
+
       <section className="hero">
         <div className="hero-inner">
-          {/* Left side text */}
+
           <div className="hero-left">
             <p className="hero-kicker">AI-powered resume insights</p>
             <h1 className="hero-title">Make your resume recruiter-ready.</h1>
@@ -37,7 +37,7 @@ function Home() {
             </div>
           </div>
 
-          {/* Right side preview card */}
+
           <div className="hero-right">
             <div className="hero-card">
               <div className="hero-card-header">
@@ -65,7 +65,6 @@ function Home() {
         </div>
       </section>
 
-      {/* FEATURES SECTION */}
       <section className="home-section">
         <h2 className="home-section-title">Why ResumeAI?</h2>
         <p className="home-section-subtitle">
@@ -105,7 +104,7 @@ function Home() {
         </div>
       </section>
 
-      {/* TESTIMONIAL / CTA SECTION */}
+
       <section className="home-section home-section-alt">
         <div className="home-testimonial">
           <p className="testimonial-quote">

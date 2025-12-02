@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 function About() {
   return (
     <section className="page-container about-page">
-      {/* Top intro block */}
+
       <div className="about-hero">
         <h1 className="about-title">Why we built ResumeAI</h1>
         <p className="about-subtitle">
@@ -36,9 +36,9 @@ function About() {
         </div>
       </div>
 
-      {/* Main 2-column section */}
+
       <div className="about-grid">
-        {/* How it works */}
+
         <div className="about-card">
           <h2 className="about-card-title">How ResumeAI works</h2>
           <ol className="about-steps">
@@ -75,7 +75,7 @@ function About() {
           </ol>
         </div>
 
-        {/* Philosophy / design principles */}
+
         <div className="about-card">
           <h2 className="about-card-title">Our philosophy</h2>
           <ul className="about-list">
@@ -99,7 +99,7 @@ function About() {
         </div>
       </div>
 
-      {/* Bottom CTA */}
+
       <div className="about-cta">
         <div>
           <h2>Where we’re going next</h2>
