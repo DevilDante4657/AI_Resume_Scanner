@@ -1,0 +1,388 @@
+import React, { useMemo, useRef, useState } from 'react'
+import * as pdfjsLib from 'pdfjs-dist'
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js?worker'
+import { jsPDF } from 'jspdf'
+import mammoth from 'mammoth/mammoth.browser' 
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
+
+const STOPWORDS = new Set([
+  'a','an','and','the','to','of','in','for','on','with','at','by','from','as','is','are',
+  'be','this','that','it','or','we','you','your','our','their','they','i','me','my',
+  'was','were','will','can','if','but','so','about','into','over','than','then','out'
+])
+
+function tokenize(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9+\-#./ ]/g, ' ')
+    .split(/\s+/)
+    .filter(t => t && !STOPWORDS.has(t))
+}
+
+function unique(arr){ return [...new Set(arr)] }
+
+function freqMap(tokens){
+  const m = new Map()
+  for(const t of tokens) m.set(t, (m.get(t)||0)+1)
+  return m
+}
+
+function scoreResume(jobText, resumeText, extraKeywords = []) {
+  const jobTokens = tokenize(jobText).concat(extraKeywords.map(k=>k.toLowerCase()))
+  const resumeTokens = tokenize(resumeText)
+
+  const jobSet = new Set(jobTokens)
+  const resSet = new Set(resumeTokens)
+
+  const intersection = [...jobSet].filter(x => resSet.has(x))
+  const union = unique([...jobSet, ...resumeTokens])
+
+  const jaccard = union.length ? intersection.length / union.length : 0
+
+  const jobFreq = freqMap(jobTokens)
+  const resFreq = freqMap(resumeTokens)
+
+  let covered = 0, total = 0
+  for (const [k, jf] of jobFreq.entries()) {
+    total += jf
+    covered += Math.min(jf, resFreq.get(k) || 0)
+  }
+  const coverage = total ? covered / total : 0
+
+  const score = Math.round((0.5 * jaccard + 0.5 * coverage) * 100)
+  const missing = [...jobSet].filter(k => !resSet.has(k))
+  const matches = [...jobSet]
+    .filter(k => resSet.has(k))
+    .sort((a, b) => (resFreq.get(b)||0) - (resFreq.get(a)||0))
+    .slice(0, 20)
+
+  return { score, jaccard, coverage, missing, matches }
+}
+
+async function extractPdfText(file) {
+  const data = await file.arrayBuffer()
+  const pdf = await pdfjsLib.getDocument({ data }).promise
+  let fullText = ''
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i)
+    const content = await page.getTextContent()
+    fullText += content.items.map(it => it.str).join(' ') + '\n'
+  }
+  return fullText
+}
+
+async function extractDocxText(file) {
+  const arrayBuffer = await file.arrayBuffer()
+  const { value } = await mammoth.extractRawText({ arrayBuffer })
+  return value || ''
+}
+
+function Card({ title, children, right, dragHint }) {
+  return (
+    <section className={`card ${dragHint ? 'drag-hint' : ''}`}>
+      <div className="card-head">
+        <h2>{title}</h2>
+        <div>{right}</div>
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function Stat({ label, value }) {
+  return (
+    <div className="stat">
+      <div className="stat-value">{value}</div>
+      <div className="stat-label">{label}</div>
+    </div>
+  )
+}
+
+function Pill({ children, muted }) {
+  return <span className={`pill ${muted ? 'muted': ''}`}>{children}</span>
+}
+
+function Highlighter({ text, terms }) {
+  const termsSet = new Set(terms.map(t => t.toLowerCase()))
+  const parts = text.split(/(\s+)/).map((chunk, i) => {
+    if (/\s+/.test(chunk)) return <span key={i}>{chunk}</span>
+    const clean = chunk.toLowerCase().replace(/[^a-z0-9+\-#./]/g, '')
+    if (termsSet.has(clean)) return <mark key={i}>{chunk}</mark>
+    return <span key={i}>{chunk}</span>
+  })
+  return <p className="mono">{parts}</p>
+}
+
+function Radar({ values }) {
+  const rows = 10
+  const grid = Array.from({length: rows}, (_,r) => {
+    const threshold = (rows - r) * 10
+    return (
+      <div key={r} className="radar-row">
+        <span className="radar-axis">{String(threshold).padStart(3,' ')}</span>
+        {values.map((v, i) => (
+          <span key={i} className={`radar-cell ${v.pct*100 >= threshold ? 'on' : ''}`}>•</span>
+        ))}
+      </div>
+    )
+  })
+  return (
+    <div className="radar">
+      {grid}
+      <div className="radar-legend">
+        {values.map((v,i)=><span key={i} className="legend-item">{v.label}</span>)}
+      </div>
+    </div>
+  )
+}
+
+export default function App() {
+  const [job, setJob] = useState(
+`We are looking for a Front-End Engineer with React, TypeScript, hooks, testing (Jest/RTL),
+state management (Redux/Zustand), REST/GraphQL, accessibility (WCAG), and CI/CD familiarity.`
+  )
+  const [resumeText, setResumeText] = useState('')
+  const [fileName, setFileName] = useState('')
+  const [extraKeywords, setExtraKeywords] = useState('React, TypeScript, Redux, Hooks, Accessibility, GraphQL, CI/CD, Testing, Vite, Webpack')
+  const fileInputRef = useRef(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [dragOver, setDragOver] = useState(false)
+
+  const keywords = useMemo(() =>
+    unique(tokenize(extraKeywords.replace(/,/g,' '))).slice(0,60), [extraKeywords]
+  )
+
+  const results = useMemo(() => {
+    if (!resumeText || !job) return null
+    const r = scoreResume(job, resumeText, keywords)
+    const cat = (list) => list.map(x => x.toLowerCase())
+    const rt = cat(['react','hooks','jsx','vite','webpack'])
+    const ts = cat(['typescript','ts','typing'])
+    const st = cat(['redux','zustand','state','store'])
+    const ac = cat(['accessibility','wcag','aria'])
+    const te = cat(['jest','rtl','testing','test'])
+    const ap = cat(['rest','graphql','api','fetch'])
+
+    const has = (bag) => {
+      const resTokens = new Set(tokenize(resumeText))
+      return bag.some(k => resTokens.has(k))
+    }
+
+    return {
+      ...r,
+      categories: [
+        { label: 'React', pct: has(rt) ? 0.9 : 0.2 },
+        { label: 'TypeScript', pct: has(ts) ? 0.9 : 0.2 },
+        { label: 'State', pct: has(st) ? 0.9 : 0.2 },
+        { label: 'A11y', pct: has(ac) ? 0.9 : 0.2 },
+        { label: 'Testing', pct: has(te) ? 0.9 : 0.2 },
+        { label: 'API', pct: has(ap) ? 0.9 : 0.2 },
+      ]
+    }
+  }, [job, resumeText, keywords])
+
+  async function handleFile(file){
+    setError('')
+    setLoading(true)
+    setFileName(file.name)
+    try {
+      let text = ''
+      const lower = file.name.toLowerCase()
+      if (file.type === 'text/plain' || lower.endsWith('.txt')) {
+        text = await file.text()
+      } else if (file.type === 'application/pdf' || lower.endsWith('.pdf')) {
+        text = await extractPdfText(file)
+      } else if (
+        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        lower.endsWith('.docx')
+      ) {
+        text = await extractDocxText(file)
+      } else {
+        throw new Error('Unsupported file type. Use PDF, DOCX, or TXT.')
+      }
+      setResumeText(text)
+    } catch (e) {
+      console.error(e)
+      setError(e.message || 'Could not read file.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function onDragOver(e){
+    e.preventDefault()
+    setDragOver(true)
+  }
+  function onDragLeave(){
+    setDragOver(false)
+  }
+  function onDrop(e){
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) handleFile(file)
+  }
+
+  function exportReport(){
+    if (!results) return
+    const doc = new jsPDF({ unit: 'pt' })
+    const pad = 40
+    let y = pad
+
+    doc.setFont('helvetica','bold')
+    doc.setFontSize(16)
+    doc.text('Resume Scanner Report', pad, y); y += 22
+
+    doc.setFont('helvetica','normal')
+    doc.setFontSize(10)
+    doc.text(`Generated: ${new Date().toLocaleString()}`, pad, y); y += 18
+    if (fileName) { doc.text(`File: ${fileName}`, pad, y); y += 18 }
+    y += 6
+
+    doc.setFontSize(12)
+    doc.text(`Match: ${results.score}%`, pad, y); y += 16
+    doc.text(`Jaccard: ${Math.round(results.jaccard*100)}%`, pad, y); y += 16
+    doc.text(`Coverage: ${Math.round(results.coverage*100)}%`, pad, y); y += 22
+
+    doc.setFont('helvetica','bold'); doc.text('Top Matches', pad, y); y += 16
+    doc.setFont('helvetica','normal')
+    const matches = results.matches.length ? results.matches.join(', ') : 'None'
+    const mLines = doc.splitTextToSize(matches, 535)
+    doc.text(mLines, pad, y); y += mLines.length * 14 + 10
+
+    doc.setFont('helvetica','bold'); doc.text('Missing / Weak', pad, y); y += 16
+    doc.setFont('helvetica','normal')
+    const missing = results.missing.slice(0,80).join(', ')
+    const msLines = doc.splitTextToSize(missing || 'None', 535)
+    doc.text(msLines, pad, y); y += msLines.length * 14 + 10
+
+    doc.setFont('helvetica','bold'); doc.text('Job Description (excerpt)', pad, y); y += 16
+    doc.setFont('helvetica','normal')
+    const jobExcerpt = (job || '').slice(0, 1500)
+    const jLines = doc.splitTextToSize(jobExcerpt, 535)
+    doc.text(jLines, pad, y)
+
+    doc.save(`resume-scan-${Date.now()}.pdf`)
+  }
+
+  return (
+    <div className="wrap">
+      <header className="topbar">
+        <h1>Resume Scanner</h1>
+        <div className="toolbar">
+          <button className="ghost" onClick={() => {
+            setResumeText(''); setFileName(''); setError('')
+            if (fileInputRef.current) fileInputRef.current.value = null
+          }}>Reset</button>
+          <button
+            className="primary"
+            disabled={!results}
+            onClick={exportReport}
+            title={results ? 'Export PDF report' : 'Add resume & job to enable'}
+          >
+            Export PDF
+          </button>
+        </div>
+      </header>
+
+      <div className="grid">
+        <Card title="Job Description">
+          <textarea
+            value={job}
+            onChange={e=>setJob(e.target.value)}
+            placeholder="Paste the job description here…"
+            rows={10}
+          />
+          <label className="label">Extra keywords (comma/space separated)</label>
+          <input
+            value={extraKeywords}
+            onChange={e=>setExtraKeywords(e.target.value)}
+            placeholder="React, TypeScript, Redux, …"
+          />
+          <div className="chips">
+            {keywords.slice(0,20).map(k => <Pill key={k}>{k}</Pill>)}
+            {keywords.length > 20 && <Pill muted>+{keywords.length-20} more</Pill>}
+          </div>
+        </Card>
+
+        <div
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+        >
+          <Card
+            title="Your Resume"
+            right={<small className="muted">{fileName || 'No file selected'}</small>}
+            dragHint={dragOver}
+          >
+            <div className={`dropzone ${dragOver ? 'over' : ''}`}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.txt,.docx"
+                onChange={e=> e.target.files?.[0] && handleFile(e.target.files[0])}
+              />
+              <p className="muted small">
+                Drag & drop a <strong>PDF</strong>, <strong>DOCX</strong>, or <strong>TXT</strong> here,
+                or click to choose a file.
+              </p>
+            </div>
+
+            <textarea
+              value={resumeText}
+              onChange={e=>setResumeText(e.target.value)}
+              placeholder="Or paste your resume text here…"
+              rows={10}
+            />
+            {loading && <div className="loading">Reading file…</div>}
+            {error && <div className="error">{error}</div>}
+          </Card>
+        </div>
+
+        <Card
+          title="Match Overview"
+          right={results && <Pill>{results.score}% match</Pill>}
+        >
+          {results ? (
+            <>
+              <div className="stats">
+                <Stat label="Overall" value={`${results.score}%`} />
+                <Stat label="Jaccard" value={`${Math.round(results.jaccard*100)}%`} />
+                <Stat label="Coverage" value={`${Math.round(results.coverage*100)}%`} />
+              </div>
+
+              <Radar values={results.categories} />
+
+              <h3>Top Matches</h3>
+              <div className="chips">
+                {results.matches.map(k => <Pill key={k}>{k}</Pill>)}
+                {!results.matches.length && <span className="muted">None yet—add skills to your resume text.</span>}
+              </div>
+
+              <h3>Missing / Weak</h3>
+              <div className="chips">
+                {results.missing.slice(0,25).map(k => <Pill key={k} muted>{k}</Pill>)}
+                {results.missing.length > 25 && <Pill muted>+{results.missing.length-25} more</Pill>}
+              </div>
+            </>
+          ) : (
+            <p className="muted">Upload/paste your resume and job description to see results.</p>
+          )}
+        </Card>
+
+        <Card title="Highlighted Resume (found keywords)">
+          {resumeText
+            ? <Highlighter text={resumeText} terms={[...keywords, ...tokenize(job)]} />
+            : <p className="muted">Highlights will appear after you add resume text.</p>
+          }
+        </Card>
+      </div>
+
+      <footer className="footer">
+        <small>All scoring runs entirely in your browser. No files are uploaded.</small>
+      </footer>
+    </div>
+  )
+}
