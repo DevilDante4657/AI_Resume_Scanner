@@ -12,7 +12,6 @@ import Footer from "./components/Footer";
 import Home from "./pages/Home";
 import Scanner from "./pages/Scanner";
 import About from "./pages/About";
-import Contact from "./pages/Contact";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import AdminLogin from "./pages/AdminLogin";
@@ -72,15 +71,6 @@ function AppRoutes() {
               </PrivateRoute>
             }
           />
-          <Route
-            path="/contact"
-            element={
-              <PrivateRoute>
-                <Contact />
-              </PrivateRoute>
-            }
-          />
-
 
           <Route
             path="/admin"
