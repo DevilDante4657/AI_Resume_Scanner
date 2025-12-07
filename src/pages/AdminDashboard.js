@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 
 const USERS_KEY = "resumeai_users";
 const SCANS_PREFIX = "resumeai_scans_";
+const JOBS_PREFIX = "resumeai_jobs_";
 
 function AdminDashboard() {
   const { user } = useAuth();
@@ -33,13 +34,43 @@ function AdminDashboard() {
     }
   };
 
+  const getJobsForUser = (username) => {
+    const key = JOBS_PREFIX + username;
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  };
+
+  const handleDownload = (scan) => {
+    if (!scan.content) {
+      alert("No resume content stored for this scan (old entry or empty file).");
+      return;
+    }
+    const blob = new Blob([scan.content], {
+      type: "text/plain;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = scan.fileName || "resume.txt";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <section className="page-container">
       <div className="scanner-card" style={{ alignItems: "stretch" }}>
         <h2 className="scanner-title">Admin Dashboard</h2>
         <p className="scanner-subtitle">
           Signed in as <strong>{user?.name}</strong> ({user?.role}). View all
-          registered accounts and their scan history in this browser.
+          registered accounts, their resume scores, and the jobs they&apos;ve
+          logged in this browser.
         </p>
 
         {users.length === 0 && (
@@ -50,6 +81,8 @@ function AdminDashboard() {
           <div style={{ marginTop: 16 }}>
             {users.map((u) => {
               const scans = getScansForUser(u.username);
+              const jobs = getJobsForUser(u.username);
+
               return (
                 <div
                   key={u.id}
@@ -67,7 +100,7 @@ function AdminDashboard() {
                     }}
                   >
                     <div>
-                      <strong>{u.name}</strong>{" "}
+                      <strong>{u.fullName || u.name || u.username}</strong>{" "}
                       <span style={{ fontSize: 13, color: "#6b7280" }}>
                         (@{u.username})
                       </span>
@@ -75,24 +108,77 @@ function AdminDashboard() {
                         {u.email} · {u.role}
                       </div>
                     </div>
-                    <div style={{ fontSize: 13, color: "#6b7280" }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: "#6b7280",
+                        textAlign: "right",
+                      }}
+                    >
                       {scans.length} scans
+                      <br />
+                      {jobs.length} jobs logged
                     </div>
                   </div>
 
+
                   {scans.length > 0 && (
-                    <ul className="breakdown-list">
-                      {scans.map((scan) => (
-                        <li key={scan.id} className="breakdown-item">
-                          <span className="breakdown-label">
-                            {scan.fileName || "Untitled resume"}
-                          </span>
-                          <span className="breakdown-points">
-                            {scan.score}%
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                    <>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: "#6b7280",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Resumes
+                      </div>
+                      <ul className="breakdown-list">
+                        {scans.map((scan) => (
+                          <li key={scan.id} className="breakdown-item">
+                            <span className="breakdown-label">
+                              {scan.fileName || "Untitled resume"}
+                            </span>
+                            <span className="breakdown-points">
+                              {scan.score}%
+                              <button
+                                type="button"
+                                className="link-button"
+                                onClick={() => handleDownload(scan)}
+                                style={{ marginLeft: 8 }}
+                              >
+                                Download
+                              </button>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+
+                  {/* Jobs list */}
+                  {jobs.length > 0 && (
+                    <>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: "#6b7280",
+                          margin: "6px 0 4px",
+                        }}
+                      >
+                        Jobs applied to
+                      </div>
+                      <ul className="breakdown-list">
+                        {jobs.map((job) => (
+                          <li key={job.id} className="breakdown-item">
+                            <span className="breakdown-label">
+                              {job.title}
+                              {job.company ? ` · ${job.company}` : ""}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
                   )}
                 </div>
               );
